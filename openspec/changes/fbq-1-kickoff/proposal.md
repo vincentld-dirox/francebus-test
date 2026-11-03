@@ -66,47 +66,47 @@ None: the project has no specs yet.
 
 ## Backlog
 
-All rows are new: FBQ-1 has no child tickets. `#` numbers are used for dependencies until the tickets have keys. "Discovery" is the France Bus workshops phase that ends with the Pricing and Operating Rules document signed off and the test set of past quotes delivered; it is not a ticket here.
+Tickets created on 2026-11-03 by /dirox-core:jira create, as FBQ-1 children with Blocks links; the Depends on column gives their keys. "Discovery" is the France Bus workshops phase that ends with the Pricing and Operating Rules document signed off and the test set of past quotes delivered; it is not a ticket here.
 
 | # | Jira | Title | Size | Depends on | Capability |
 |---|---|---|---|---|---|
-| 1 | new | Engine service skeleton: TypeScript service, health check, configuration loading, PostgreSQL and migrations, container image, local Docker Compose, test and lint in CI | big | - | tooling |
-| 2 | new | WordPress plugin skeleton with its settings page (website, language, on/off, engine connection) and the window's front-end build | big | - | plugin-settings |
-| 3 | new | Testing and staging on Dirox's servers, with staging copies of both websites, deployed from CI | big | 1, 2 | tooling |
-| 4 | new | Engine access: website keys, origin checks, rate limiting, request tokens | big | 1 | engine-access |
-| 5 | new | Tariff configuration: file format, schema validation, versioning, test fixtures | big | 1 | pricing |
-| 6 | new | Vehicle selection from the number of passengers, several vehicles above the largest capacity | normal | 5 | vehicle-selection |
-| 7 | new | Itinerary legs for each route type, with distance and driving time from Google Maps Routes and the speed coefficient | big | 5 | itinerary-routing |
-| 8 | new | Geocoding of addresses typed without a suggestion, and the route cache | big | 7 | itinerary-routing |
-| 9 | new | Driving-rule checks per leg and per day (driving time, breaks, working day, rest, minimum notice) | big | 7 | driving-rules |
-| 10 | new | Alternatives for a schedule that does not fit: break, second driver, other departure time, larger vehicle | normal | 6, 9 | driving-rules |
-| 11 | new | Base price (fixed route, per km, per duration), step-by-step breakdown and rounding | big | 6, 7 | pricing |
-| 12 | new | Surcharges (night, Sunday, holidays) and fees (tolls, parking, driver meals and lodging) | normal | 11 | pricing |
-| 13 | new | Price display switch per website, off until France Bus approves the calibration | normal | 4, 12 | pricing |
-| 14 | new | Request understanding: structured request and targeted questions with Gemini on Vertex AI (EU) | big | 1 | request-understanding |
-| 15 | new | Answers integrated, plain-words summary with the engine's figures, phone asked once | normal | 11, 14 | request-understanding |
-| 16 | new | The assistant explains why a schedule does not fit | normal | 10, 15 | driving-rules |
-| 17 | new | Quote form: stop list for multi-destination trips, stops written under "Stages" (both sites) | normal | 3 | quote-form |
-| 18 | new | Quote form: return date and time for round trips (both sites) | normal | 17 | quote-form |
-| 19 | new | Submit hands the form to the engine; today's JetFormBuilder e-mail when the engine cannot be reached | big | 2, 4 | form-submission |
-| 20 | new | Estimate log: every form and every estimate, with questions, answers, breakdown and status | big | 11, 14, 19 | estimate-log |
-| 21 | new | E-mail delivery: engine outbox, sent by the plugin through the site's mailbox, retried without duplicates | big | 4, 19 | email-delivery |
-| 22 | new | France Bus e-mail in today's exact format with the estimate block, sent on confirmation | big | 15, 21 | france-bus-email |
-| 23 | new | Unconfirmed requests sent after the delay, and call requests, flagged in the France Bus e-mail | normal | 22 | france-bus-email |
-| 24 | new | Client e-mail on confirmation, in the visitor's language | normal | 13, 15, 21 | client-email |
-| 25 | new | Estimate window: summary after Submit (request, vehicles, legs, constraints, indicative estimate), language, AI notice, both sites' styles | big | 9, 13, 15, 19 | estimate-window |
-| 26 | new | Estimate window: the assistant's questions, each with the right input | normal | 25 | estimate-window |
-| 27 | new | Estimate window: editable values with instant recalculation | normal | 26 | estimate-window |
-| 28 | new | Estimate window: alternatives selectable in one click | normal | 16, 27 | estimate-window |
-| 29 | new | Estimate window: confirmation step and "prefer to talk to us" | normal | 23, 24, 28 | estimate-window |
-| 30 | new | Address suggestions in the form fields, through the engine | big | 2, 4 | address-suggestions |
-| 31 | new | Address suggestions in the estimate window's address inputs | normal | 27, 30 | address-suggestions |
-| 32 | new | Estimate log retention and CSV export | normal | 20, discovery (retention) | estimate-log |
-| 33 | new | Calibration run on the anonymised test set of past quotes | normal | 10, 13, discovery (test set) | pricing |
-| 34 | new | Tariff configuration V1 from the signed rules, passing the test set within the tolerance | normal | 33, discovery (sign-off) | pricing |
-| 35 | new | Production on France Bus's Google Cloud: Cloud Run, Cloud SQL, secrets, EU region, budget alert, deployment after approval | big | 3 | tooling |
-| 36 | new | Monitoring of errors, response times and API usage, with alerts to Dirox | normal | 35 | tooling |
-| 37 | new | Go-live runbook and checks: CRM detection on the test mailbox, Gmail and Outlook inboxes, both sites | normal | 29, 31, 32, 34, 36 | tooling |
+| 1 | FBQ-2 | Engine service skeleton: TypeScript service, health check, configuration loading, PostgreSQL and migrations, container image, local Docker Compose, test and lint in CI | big | - | tooling |
+| 2 | FBQ-3 | WordPress plugin skeleton with its settings page (website, language, on/off, engine connection) and the window's front-end build | big | - | plugin-settings |
+| 3 | FBQ-4 | Testing and staging on Dirox's servers, with staging copies of both websites, deployed from CI | big | FBQ-2, FBQ-3 | tooling |
+| 4 | FBQ-5 | Engine access: website keys, origin checks, rate limiting, request tokens | big | FBQ-2 | engine-access |
+| 5 | FBQ-6 | Tariff configuration: file format, schema validation, versioning, test fixtures | big | FBQ-2 | pricing |
+| 6 | FBQ-7 | Vehicle selection from the number of passengers, several vehicles above the largest capacity | normal | FBQ-6 | vehicle-selection |
+| 7 | FBQ-8 | Itinerary legs for each route type, with distance and driving time from Google Maps Routes and the speed coefficient | big | FBQ-6 | itinerary-routing |
+| 8 | FBQ-9 | Geocoding of addresses typed without a suggestion, and the route cache | big | FBQ-8 | itinerary-routing |
+| 9 | FBQ-10 | Driving-rule checks per leg and per day (driving time, breaks, working day, rest, minimum notice) | big | FBQ-8 | driving-rules |
+| 10 | FBQ-11 | Alternatives for a schedule that does not fit: break, second driver, other departure time, larger vehicle | normal | FBQ-7, FBQ-10 | driving-rules |
+| 11 | FBQ-12 | Base price (fixed route, per km, per duration), step-by-step breakdown and rounding | big | FBQ-7, FBQ-8 | pricing |
+| 12 | FBQ-13 | Surcharges (night, Sunday, holidays) and fees (tolls, parking, driver meals and lodging) | normal | FBQ-12 | pricing |
+| 13 | FBQ-14 | Price display switch per website, off until France Bus approves the calibration | normal | FBQ-5, FBQ-13 | pricing |
+| 14 | FBQ-15 | Request understanding: structured request and targeted questions with Gemini on Vertex AI (EU) | big | FBQ-2 | request-understanding |
+| 15 | FBQ-16 | Answers integrated, plain-words summary with the engine's figures, phone asked once | normal | FBQ-12, FBQ-15 | request-understanding |
+| 16 | FBQ-17 | The assistant explains why a schedule does not fit | normal | FBQ-11, FBQ-16 | driving-rules |
+| 17 | FBQ-18 | Quote form: stop list for multi-destination trips, stops written under "Stages" (both sites) | normal | FBQ-4 | quote-form |
+| 18 | FBQ-19 | Quote form: return date and time for round trips (both sites) | normal | FBQ-18 | quote-form |
+| 19 | FBQ-20 | Submit hands the form to the engine; today's JetFormBuilder e-mail when the engine cannot be reached | big | FBQ-3, FBQ-5 | form-submission |
+| 20 | FBQ-21 | Estimate log: every form and every estimate, with questions, answers, breakdown and status | big | FBQ-12, FBQ-15, FBQ-20 | estimate-log |
+| 21 | FBQ-22 | E-mail delivery: engine outbox, sent by the plugin through the site's mailbox, retried without duplicates | big | FBQ-5, FBQ-20 | email-delivery |
+| 22 | FBQ-23 | France Bus e-mail in today's exact format with the estimate block, sent on confirmation | big | FBQ-16, FBQ-22 | france-bus-email |
+| 23 | FBQ-24 | Unconfirmed requests sent after the delay, and call requests, flagged in the France Bus e-mail | normal | FBQ-23 | france-bus-email |
+| 24 | FBQ-25 | Client e-mail on confirmation, in the visitor's language | normal | FBQ-14, FBQ-16, FBQ-22 | client-email |
+| 25 | FBQ-26 | Estimate window: summary after Submit (request, vehicles, legs, constraints, indicative estimate), language, AI notice, both sites' styles | big | FBQ-10, FBQ-14, FBQ-16, FBQ-20 | estimate-window |
+| 26 | FBQ-27 | Estimate window: the assistant's questions, each with the right input | normal | FBQ-26 | estimate-window |
+| 27 | FBQ-28 | Estimate window: editable values with instant recalculation | normal | FBQ-27 | estimate-window |
+| 28 | FBQ-29 | Estimate window: alternatives selectable in one click | normal | FBQ-17, FBQ-28 | estimate-window |
+| 29 | FBQ-30 | Estimate window: confirmation step and "prefer to talk to us" | normal | FBQ-24, FBQ-25, FBQ-29 | estimate-window |
+| 30 | FBQ-31 | Address suggestions in the form fields, through the engine | big | FBQ-3, FBQ-5 | address-suggestions |
+| 31 | FBQ-32 | Address suggestions in the estimate window's address inputs | normal | FBQ-28, FBQ-31 | address-suggestions |
+| 32 | FBQ-33 | Estimate log retention and CSV export | normal | FBQ-21, discovery (retention) | estimate-log |
+| 33 | FBQ-34 | Calibration run on the anonymised test set of past quotes | normal | FBQ-11, FBQ-14, discovery (test set) | pricing |
+| 34 | FBQ-35 | Tariff configuration V1 from the signed rules, passing the test set within the tolerance | normal | FBQ-34, discovery (sign-off) | pricing |
+| 35 | FBQ-36 | Production on France Bus's Google Cloud: Cloud Run, Cloud SQL, secrets, EU region, budget alert, deployment after approval | big | FBQ-4 | tooling |
+| 36 | FBQ-37 | Monitoring of errors, response times and API usage, with alerts to Dirox | normal | FBQ-36 | tooling |
+| 37 | FBQ-38 | Go-live runbook and checks: CRM detection on the test mailbox, Gmail and Outlook inboxes, both sites | normal | FBQ-30, FBQ-32, FBQ-33, FBQ-35, FBQ-37 | tooling |
 
 Split from the charter's features so that each ticket fits one PR: `estimate-window` (rows 25 to 29), `pricing` (5, 11, 12, 13, 33, 34), `driving-rules` (9, 10, 16), `itinerary-routing` (7, 8), `request-understanding` (14, 15), `quote-form` (17, 18), `france-bus-email` (22, 23), `address-suggestions` (30, 31), `estimate-log` (20, 32). Rows on the same capability are chained by dependencies, so no two of them change its spec at the same time. Rows 28 and 29 add separate requirements and could run side by side if two people are free; they are chained to keep the window's code in one line of work.
 
