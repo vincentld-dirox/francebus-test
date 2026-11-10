@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 // testmo.mjs: the kit's Testmo calls, for projects that use Testmo (okf/integrations/testmo.md).
-// Part of dirox-core. /dirox-techlead:setup-project copies it into projects as
+// Part of dirox-core. /dirox-project:set-up-repo copies it into projects as
 // .github/scripts/testmo.mjs next to test-cases-check.mjs, which it imports: do not edit the copy.
 // No dependencies: Node 20 or later.
 //
-// The repo is the source: test-cases/<KEY>.md is synced one way into Testmo, the way QC's own
+// /dirox-ticket:testmo (sync-cases, create-run, show-results, export-csv) and /dirox-project:link-testmo
+// run it, and the Testmo workflow (.github/workflows/testmo.yml); its own commands are below.
+//
+// The repo is the source: test-cases/<feature>/<KEY>.md (test-cases/<KEY>.md before 3.0.0) is synced
+// one way into Testmo, the way QC's own
 // push-testmo-cases skill lays it out by default: one sub-folder per ticket (named after the ticket)
 // under the regression root folder, one case per kit case named by its title, plain text in
 // <p>line<br />line</p>, Reference (the Jira URL), Note (the automation plan), an estimate. A case is
@@ -29,7 +33,7 @@
 //                                  link a CI run's tests to cases by the case IDs in their names
 //   run <KEY> [--all] [--apply]    QC's manual run "<KEY>: <title>" with the ticket's manual cases
 //   status <KEY>                   the ticket's runs: passed, failed, untested
-//   csv <test-cases/KEY.md>        the cases in Testmo's CSV export format (stdout)
+//   csv <test case file>           the cases in Testmo's CSV export format (stdout)
 // Exit code: 0 = done, 1 = Testmo refused or is unreachable, 2 = bad usage or settings.
 
 import fs from "node:fs";
@@ -57,7 +61,7 @@ function parseArgs(argv) {
 
 // "- Label: `value`" lines; "none" and <placeholders> read as empty.
 export function readSettings(file = SETTINGS) {
-  if (!fs.existsSync(file)) fail(2, `${file} not found: this project does not use Testmo yet (/dirox-qc:testmo setup)`);
+  if (!fs.existsSync(file)) fail(2, `${file} not found: this project does not use Testmo yet (/dirox-project:link-testmo)`);
   const text = fs.readFileSync(file, "utf8");
   const get = (label) => {
     const m = text.match(new RegExp(`^-\\s*${label}:\\s*\`([^\`]*)\``, "mi"));
@@ -75,7 +79,7 @@ export function readSettings(file = SETTINGS) {
     typeField: get("Type field"), typeKind: get("Type field kind"), typeSmoke: get("Type smoke"), typeRegression: get("Type regression"),
     runState: get("Run state ID"), jira: get("Jira integration ID"),
   };
-  for (const [k, label] of [["instance", "Instance"], ["project", "Project ID"]]) if (!s[k]) fail(2, `${file} has no ${label}: run /dirox-qc:testmo setup`);
+  for (const [k, label] of [["instance", "Instance"], ["project", "Project ID"]]) if (!s[k]) fail(2, `${file} has no ${label}: run /dirox-project:link-testmo`);
   return s;
 }
 
@@ -103,7 +107,7 @@ function readKey(keyFile) {
       if (m && m[1]) return { token: m[1].replace(/^(['"])(.*)\1$/, "$2"), from: f, ...keyFileStatus(f) };
     }
   }
-  fail(2, `no Testmo API key: put TESTMO_TOKEN=<your key> in ${keyFile || ".env"} (git-ignored; never commit it), or set TESTMO_TOKEN in the environment. See the kit's docs/testmo.md`);
+  fail(2, `no Testmo API key: put TESTMO_TOKEN=<your key> in ${keyFile || ".env"} (git-ignored; never commit it), or set TESTMO_TOKEN in the environment. /dirox-core:help says how`);
 }
 
 function client(instance, keyFile) {
@@ -167,6 +171,10 @@ function textOf(s, lines, numberedList) {
   return `<p>${(numberedList ? numbered(lines) : lines).map(esc).join("<br />")}</p>`;
 }
 
+// QC's Note: "Automation: Manual — <reason>", or "Automation: To be automated", with what automating it
+// needs when the case says ("Proof: automated (<note>)").
+const automationNote = (c) => (c.proof === "manual" ? `Automation: Manual — ${c.manualReason}` : `Automation: To be automated${c.autoNote ? " — " + c.autoNote : ""}`);
+
 export function caseFields(s, p, c) {
   const f = {};
   const steps = textOf(s, c.steps, true);
@@ -183,7 +191,7 @@ export function caseFields(s, p, c) {
   }
   const site = jiraSite();
   if (s.referenceField && site) f[s.referenceField] = `<p>${esc(`https://${site}/browse/${p.key}`)}</p>`;
-  if (s.noteField) f[s.noteField] = `<p>${esc(c.proof === "manual" ? `Automation: Manual — ${c.manualReason}` : "Automation: To be automated")}</p>`;
+  if (s.noteField) f[s.noteField] = `<p>${esc(automationNote(c))}</p>`;
   if (s.priorityField) {
     const v = c.priority === "High" ? s.priorityHigh : s.priorityNormal;
     if (v) f[s.priorityField] = Number(v);
@@ -198,7 +206,13 @@ export function caseFields(s, p, c) {
 const caseName = (s, c) => (s.caseName === "id-title" ? `${c.id} · ${c.title}` : c.title);
 // The sub-folder, as QC names it: the file's "folder:" line (their CSV "Folder" column, a feature or
 // section name such as "App ADV - Carelog reactions"), else the ticket title.
-const folderName = (s, p) => (s.groupBy === "capability" ? p.cap || "Unsorted" : p.front.folder || p.title || p.key);
+// Grouped by feature ("Group by: feature", "capability" before 3.0.0): the file's cap: line, else its
+// feature folder (test-cases/<feature>/).
+const byFeature = (s) => s.groupBy === "feature" || s.groupBy === "capability";
+const folderName = (s, p) => (byFeature(s) ? p.feature || p.cap || "Unsorted" : p.front.folder || p.title || p.key);
+// The folders under the root, outermost first: the file's "module:" line (the module folder QC's push
+// takes as its parent, such as "Profil"), then the ticket's sub-folder. Grouped by feature: no module.
+const folderPath = (s, p) => (!byFeature(s) && p.front.module ? [p.front.module, folderName(s, p)] : [folderName(s, p)]);
 const folderUrl = (s, id) => (id ? `${s.instance}/repositories/${s.project}?group_id=${id}` : null);
 
 // ---------------------------------------------------------------- Testmo lookups
@@ -209,7 +223,7 @@ async function rootFolder(api, s, apply, plan) {
     if (!root) fail(2, `Root folder ID ${s.rootFolderId} is not a folder of project ${s.project}`);
     return { root, folders };
   }
-  if (!s.rootFolder) fail(2, `${SETTINGS} has no Root folder ID: run /dirox-qc:testmo setup`);
+  if (!s.rootFolder) fail(2, `${SETTINGS} has no Root folder ID: run /dirox-project:link-testmo`);
   let root = folders.find((f) => f.name === s.rootFolder && !f.parent_id);
   if (!root) {
     plan.createFolders.push(s.rootFolder);
@@ -220,15 +234,23 @@ async function rootFolder(api, s, apply, plan) {
   return { root, folders };
 }
 
-async function subFolder(api, s, ctx, name, apply, plan) {
-  if (!ctx.root) return null;
-  let f = ctx.folders.find((x) => x.parent_id === ctx.root.id && x.name === name);
-  if (f) return f;
-  plan.createFolders.push(`${ctx.root.name}/${name}`);
-  if (!apply) return null;
-  f = (await api.call("POST", `/projects/${s.project}/folders`, { folders: [{ name, parent_id: ctx.root.id }] })).result[0];
-  ctx.folders.push(f);
-  return f;
+// The folder at the end of names under the root, each found by name under the one before, else
+// created (a dry run only lists it, and every folder below a missing one is missing too).
+async function subFolder(api, s, ctx, names, apply, plan) {
+  let parent = ctx.root;
+  const trail = [ctx.root ? ctx.root.name : s.rootFolder];
+  for (const name of names) {
+    trail.push(name);
+    let f = parent && ctx.folders.find((x) => x.parent_id === parent.id && x.name === name);
+    if (!f) {
+      if (!plan.createFolders.includes(trail.join("/"))) plan.createFolders.push(trail.join("/"));
+      if (!apply || !parent) { parent = null; continue; }
+      f = (await api.call("POST", `/projects/${s.project}/folders`, { folders: [{ name, parent_id: parent.id }] })).result[0];
+      ctx.folders.push(f);
+    }
+    parent = f;
+  }
+  return parent;
 }
 
 // Write "- Testmo: <id>" into each new case's block, right after its "- Covers:" line. Only that line
@@ -254,9 +276,9 @@ function writeBack(file, newIds) {
 
 // ---------------------------------------------------------------- commands
 async function sync(files, opts, quiet = false) {
-  if (!files.length) fail(2, "sync needs test-cases/<KEY>.md files");
+  if (!files.length) fail(2, "sync needs test case files (test-cases/<feature>/<KEY>.md)");
   const s = readSettings();
-  if (!s.template || !s.stepsField) fail(2, `${SETTINGS} needs a Case template ID and a Steps field: run /dirox-qc:testmo setup`);
+  if (!s.template || !s.stepsField) fail(2, `${SETTINGS} needs a Case template ID and a Steps field: run /dirox-project:link-testmo`);
   const tc = await testCasesModule();
   const api = client(s.instance, s.keyFile);
   const apply = Boolean(opts.apply);
@@ -267,11 +289,11 @@ async function sync(files, opts, quiet = false) {
     if (!fs.existsSync(file)) { plan.files.push({ file, error: "not found" }); continue; }
     const p = tc.checkTestCases(fs.readFileSync(file, "utf8"), file);
     if (p.errors.length) { plan.files.push({ file, error: p.errors.join(" ") }); continue; }
-    const folder = await subFolder(api, s, ctx, folderName(s, p), apply, plan);
+    const folder = await subFolder(api, s, ctx, folderPath(s, p), apply, plan);
     const inFolder = folder ? await api.all(`/projects/${s.project}/cases?folder_id=${folder.id}`) : [];
     const byName = new Map(inFolder.map((c) => [c.name, c]));
     const issues = s.jira ? [{ display_id: p.key, integration_id: Number(s.jira) }] : undefined;
-    const out = { file, key: p.key, folder: `${ctx.root ? ctx.root.name : s.rootFolder}/${folderName(s, p)}`, create: [], update: [], skip: [], folder_url: folderUrl(s, folder && folder.id) };
+    const out = { file, key: p.key, folder: [ctx.root ? ctx.root.name : s.rootFolder, ...folderPath(s, p)].join("/"), create: [], update: [], skip: [], folder_url: folderUrl(s, folder && folder.id) };
     const toCreate = [];
     const seen = new Set();
     for (const c of p.cases) {
@@ -324,9 +346,11 @@ async function sync(files, opts, quiet = false) {
 async function knownIds() {
   const tc = await testCasesModule();
   const out = {};
-  if (!fs.existsSync("test-cases")) return out;
-  for (const f of fs.readdirSync("test-cases").filter((x) => x.endsWith(".md") && x !== "README.md")) {
-    for (const c of tc.parseTestCases(fs.readFileSync(path.join("test-cases", f), "utf8"), f).cases) {
+  // Every case file, in its feature folder or at the root (before 3.0.0); an older checker reads the root only.
+  const files = tc.testCaseFiles ? tc.testCaseFiles(".")
+    : fs.existsSync("test-cases") ? fs.readdirSync("test-cases").filter((x) => x.endsWith(".md") && x !== "README.md").map((x) => `test-cases/${x}`) : [];
+  for (const f of files) {
+    for (const c of tc.parseTestCases(fs.readFileSync(f, "utf8"), f).cases) {
       if (c.testmo) out[c.id] = Number(String(c.testmo).replace(/\D/g, ""));
     }
   }
@@ -361,10 +385,11 @@ async function findRuns(api, s, key) {
 
 async function run(key, all, apply) {
   if (!key) fail(2, "run needs a ticket key");
-  const file = `test-cases/${key}.md`;
-  if (!fs.existsSync(file)) fail(2, `${file} not found`);
+  const tcm = await testCasesModule();
+  const file = (tcm.findTestCaseFile && tcm.findTestCaseFile(key, ".")) || `test-cases/${key}.md`;
+  if (!fs.existsSync(file)) fail(2, `no test case file for ${key} (test-cases/<feature>/${key}.md): /dirox-ticket:write-test-cases ${key} writes it`);
   const s = readSettings();
-  if (!s.runState) fail(2, `${SETTINGS} has no Run state ID: run /dirox-qc:testmo setup`);
+  if (!s.runState) fail(2, `${SETTINGS} has no Run state ID: run /dirox-project:link-testmo`);
   const tc = await testCasesModule();
   const plan = await sync([file], { apply }, true);
   const p = tc.parseTestCases(fs.readFileSync(file, "utf8"), file);
@@ -408,12 +433,13 @@ const CSV_HEADER = ["Case ID", "Case", "Automated", "Automation", "Configuration
 const CSV_COL = { caseId: 0, case: 1, automation: 3, description: 7, estimate: 9, expected: 10, folder: 11, forecast: 12,
   issues: 13, note: 14, preCondition: 16, priority: 17, reference: 18, state: 19, tags: 25, template: 26, testType: 28 };
 async function csv(file) {
-  if (!file || !fs.existsSync(file)) fail(2, "csv needs a test-cases/<KEY>.md file");
+  if (!file || !fs.existsSync(file)) fail(2, "csv needs a test case file (test-cases/<feature>/<KEY>.md)");
   const tc = await testCasesModule();
   const p = tc.parseTestCases(fs.readFileSync(file, "utf8"), file);
   let s = { caseName: "title", groupBy: "ticket", estimate: "300", templateName: "Case (no steps)" };
   if (fs.existsSync(SETTINGS)) s = { ...s, ...Object.fromEntries(Object.entries(readSettings()).filter(([, v]) => v)) };
-  const site = jiraSite() || "vitalliance.atlassian.net";
+  // No Jira site in the settings: the Reference stays empty, as in sync, never another project's Jira.
+  const site = jiraSite();
   const quote = (v) => '"' + String(v ?? "").replace(/\r?\n/g, "\r\n").replace(/"/g, '""') + '"';
   const estimate = String(Number(s.estimate) || 300);
   const rows = p.cases.map((c) => {
@@ -427,11 +453,11 @@ async function csv(file) {
     row[CSV_COL.folder] = p.front.folder || p.title || p.key;
     row[CSV_COL.forecast] = estimate;
     row[CSV_COL.issues] = p.key;
-    row[CSV_COL.note] = c.proof === "manual" ? "Automation: Manual — " + c.manualReason : "Automation: To be automated";
+    row[CSV_COL.note] = automationNote(c);
     // The writer starts pre-conditions with "User: Guest." or "User: Logged In.", as QC's builder does.
     row[CSV_COL.preCondition] = c.preconditions.join("\n");
     row[CSV_COL.priority] = c.priority;
-    row[CSV_COL.reference] = "https://" + site + "/browse/" + p.key;
+    row[CSV_COL.reference] = site ? "https://" + site + "/browse/" + p.key : "";
     row[CSV_COL.state] = "Active";
     row[CSV_COL.tags] = p.key + "," + c.type;
     row[CSV_COL.template] = s.templateName || "Case (no steps)";
@@ -465,6 +491,8 @@ async function info(a) {
     case_fields: fields.map((f) => ({ name: f.name, column_name: f.column_name, type: f.type, options: (f.options || []).flatMap((o) => (o.values || []).map((v) => ({ id: v.id, name: v.name }))) })),
     states: states.map((x) => ({ id: x.id, name: x.name, is_default: x.is_default })),
     folders: folders.filter((f) => !f.parent_id || String(f.id) === String(a.folder || "")).map((f) => ({ id: f.id, name: f.name })),
+    // With --folder: the folders right under it (the modules QC pushes tickets into).
+    ...(a.folder ? { sub_folders: folders.filter((f) => String(f.parent_id) === String(a.folder)).map((f) => ({ id: f.id, name: f.name })) } : {}),
     issue_connections: connections.map((c) => ({ integration_id: c.integration_id, name: c.connection_name, project: c.connection_project_name })),
   }, null, 2));
 }

@@ -9,14 +9,14 @@ tags: [jira]
 ---
 # Jira
 
-<!-- Saved as okf/integrations/jira.md by /dirox-techlead:setup-project or /dirox-core:jira setup, in this section order. The commands
-     read it instead of guessing. Run setup again when the Jira setup changes: it keeps these values
+<!-- Saved as okf/integrations/jira.md by /dirox-project:set-up-repo or /dirox-core:jira record-config, in this section order. The commands
+     read it instead of guessing. Run /dirox-core:jira record-config again when the Jira setup changes: it keeps these values
      and fills only what is missing. -->
 
 ## Project
 - Site: `dirox.atlassian.net` (cloud ID `95d0c454-e898-47cf-ae79-94d5aee722c2`)
 - Project key: `FBQ`
-- Kickoff epic: `FBQ-1`
+- Charter epic: `FBQ-1`
 
 ## Acceptance criteria
 - Where: `description, under the heading "Acceptance criteria"`
@@ -47,12 +47,12 @@ tags: [jira]
      A team that already uses a component or a custom field for one of them names it instead. -->
 | What | Where | Values |
 |---|---|---|
-| Source | label | `src:kickoff`, `src:claude`, `src:pm` |
-| Capability | label `cap:<capability>` | the capability name, as in `openspec/specs/`, or `tooling` for work outside the specs |
-| Size | label `size:<value>` | `trivial`, `normal`, `big` |
+| Source | label | `src:intent`, `src:kickoff`, `src:claude`, `src:pm` |
+| Feature | label `cap:<feature>` | the feature name, as in `openspec/specs/`, or `tooling` for work outside the specs |
+| Size | label `size:<value>` | `trivial`, `normal`, `large` |
 | Difficulty | label `difficulty:<value>` | `routine`, `tricky` |
 
 ## Conventions
 - Labels or components the team uses: none yet (the project has no tickets)
-- Review turnaround: `2 working days` (a PR waiting longer for a review gate is flagged by `/dirox-core:jira status`)
+- Review turnaround: `2 working days` (a PR waiting longer for a review gate is flagged by `/dirox-core:jira report-sprint`)
 - Started before the baseline: `none`
