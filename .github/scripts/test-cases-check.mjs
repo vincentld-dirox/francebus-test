@@ -1,15 +1,18 @@
 #!/usr/bin/env node
-// test-cases-check.mjs: reads and checks a ticket's test case file, test-cases/<KEY>.md.
-// Part of dirox-core. /dirox-techlead:setup-project copies it into projects as
+// test-cases-check.mjs: reads and checks a ticket's test case file, test-cases/<feature>/<KEY>.md
+// (one folder per feature: the ticket's cap: value, the openspec/specs/<feature>/ folder name), or
+// test-cases/<KEY>.md as written before 3.0.0, which still works. test-cases/README.md is not a case file.
+// Part of dirox-core. /dirox-project:set-up-repo copies it into projects as
 // .github/scripts/test-cases-check.mjs next to pr-check.mjs, which imports it: do not edit the copy.
 // No dependencies: Node 20 or later.
 //
-// The format (written by /dirox-qc:test-cases, edited by QC):
+// The format (written by /dirox-ticket:write-test-cases, edited by QC):
 //   ---
 //   jira: PROJ-123
 //   status: draft | validated
-//   cap: <capability>            (optional: the Testmo folder the cases are synced into)
+//   cap: <feature>               (optional: the Testmo folder the cases are synced into)
 //   folder: <Testmo sub-folder>  (optional)
+//   module: <Testmo module folder> (optional: the folder under the root the sub-folder goes in)
 // A "qc:" line (kit 2.0) is ignored: QC tests every PR that changes code since 2.1.0.
 //   ---
 //   # PROJ-123 · <ticket summary>
@@ -17,7 +20,7 @@
 //   ## PROJ-123-01 · <case title>
 //   - Priority: High | Normal
 //   - Type: smoke | regression
-//   - Proof: automated | manual (<reason>)
+//   - Proof: automated [(<what automating it needs>)] | manual (<reason>)
 //   - Covers: <the acceptance criterion or scenario>
 //   - Testmo: <case id>          (optional, once the case is in Testmo)
 //   Pre-conditions:              (optional) a list
@@ -26,7 +29,7 @@
 //
 // Usage: node test-cases-check.mjs <file>... [--json]
 //        node test-cases-check.mjs <file> --since <commit>
-//   --since: which edits made since <commit> need the tests checked again (close-change uses it
+//   --since: which edits made since <commit> need the tests checked again (finish-ticket uses it
 //   after QC edited the file): an automated case added, an expected result of an automated case
 //   changed, or a case switched to automated. Title, Covers, steps and wording elsewhere do not.
 //   Prints JSON {reverify: [ids], ignored: [ids]}; exit 0 either way.
@@ -77,13 +80,41 @@ export function parseTestCases(text, file = "") {
       priority: field("Priority"), type: field("Type"),
       proof: /^automated\b/i.test(proof) ? "automated" : /^manual\b/i.test(proof) ? "manual" : proof,
       manualReason: (proof.match(/^manual\s*\(?\s*[-—:]?\s*(.*?)\)?\s*$/i) || [])[1] || "",
+      autoNote: (proof.match(/^automated\s*\(\s*(.*?)\s*\)\s*$/i) || [])[1] || "",
       covers: field("Covers"), testmo: field("Testmo"),
       preconditions: section(lines, "Pre-conditions") || [],
       steps: section(lines, "Steps"), expected: section(lines, "Expected"),
     });
   }
   const title = ((t.match(/^# (.+)$/m) || [])[1] || "").replace(/^[A-Z][A-Z0-9]*-\d+\s*[·\-–—:|]\s*/, "").trim();
-  return { key, title, cap: front.cap || "", status: (front.status || "").toLowerCase(), front, cases };
+  // The feature: the cap: line, else the folder the file sits in (test-cases/<feature>/<KEY>.md).
+  const folder = (String(file).split(/[\\/]/).slice(-3).join("/").match(/^test-cases\/([^/]+)\/[^/]+$/) || [])[1] || "";
+  return { key, title, cap: front.cap || "", feature: front.cap || folder, status: (front.status || "").toLowerCase(), front, cases };
+}
+
+// Every test case file under a project's test-cases/: one level of feature folders, and the files
+// at the root written before 3.0.0. A README.md is never one. Paths as "test-cases/...".
+export function testCaseFiles(root = ".") {
+  const dir = path.join(root, "test-cases");
+  if (!fs.existsSync(dir)) return [];
+  const out = [];
+  const isCase = (e) => e.isFile() && e.name.endsWith(".md") && !/^readme\.md$/i.test(e.name);
+  for (const e of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1))) {
+    if (isCase(e)) out.push(`test-cases/${e.name}`);
+    else if (e.isDirectory() && !e.name.startsWith(".")) {
+      for (const f of fs.readdirSync(path.join(dir, e.name), { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1))) {
+        if (isCase(f)) out.push(`test-cases/${e.name}/${f.name}`);
+      }
+    }
+  }
+  return out;
+}
+
+// A ticket's test case file: test-cases/<feature>/<KEY>.md, else test-cases/<KEY>.md; null when none.
+export function findTestCaseFile(key, root = ".") {
+  const k = String(key || "").toUpperCase();
+  const hits = testCaseFiles(root).filter((f) => path.basename(f, ".md").toUpperCase() === k);
+  return hits.find((f) => f.split("/").length === 3) || hits[0] || null;
 }
 
 export function checkTestCases(text, file = "") {
@@ -144,7 +175,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   }
   const files = args.filter((a) => a !== "--json");
   if (!files.length) {
-    console.error("usage: test-cases-check.mjs <test-cases/KEY.md>... [--json]");
+    console.error("usage: test-cases-check.mjs test-cases/<feature>/<KEY>.md... [--json]");
     process.exit(2);
   }
   let failed = 0;
@@ -152,7 +183,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   for (const f of files) {
     if (!fs.existsSync(f)) { console.error(`test-cases-check: ${f} not found`); process.exit(2); }
     const r = checkTestCases(fs.readFileSync(f, "utf8"), f);
-    out.push({ file: f, key: r.key, status: r.status, cases: r.cases, errors: r.errors });
+    out.push({ file: f, key: r.key, feature: r.feature, status: r.status, cases: r.cases, errors: r.errors });
     if (r.errors.length) failed++;
     if (!json) {
       for (const e of r.errors) console.log(`ERROR ${e}`);
